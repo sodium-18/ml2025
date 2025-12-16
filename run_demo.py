@@ -1,6 +1,9 @@
 # -*- coding: utf-8 -*-
+import os
+os.environ.setdefault('OMP_NUM_THREADS','2')
 import numpy as np
 from sklearn import svm
+from sklearn.metrics.pairwise import rbf_kernel
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.datasets import make_classification
 from sklearn.model_selection import train_test_split
@@ -55,8 +58,30 @@ def main():
     LAM = 1.0       # lambda_0 (初始权重)
     LAM_UR = 0.01   # delta_lambda (衰减率)
 
+    # # 这的准确率更高
+    # M = 50          # 主动学习迭代次数 (想要跑得久可以改大，例如 100)
+    # GAM = 0         # gamma_0 (初始为0)
+    # GAM_UR = 0.004  # delta_gamma (增长率)
+    # LAM = 1.5       # lambda_0 (初始权重)
+    # LAM_UR = 0.005   # delta_lambda (衰减率)
+
+    ##############################################################################################
+    # prepare a mixed kernel function (alpha * RBF + (1-alpha) * linear)
+    def mixed_kernel_factory(alpha=0.6, gamma=0.1):
+        def kernel_fn(xA, xB):
+            # xA, xB are 1xD numpy arrays
+            r = rbf_kernel(np.vstack([xA, xB]), gamma=gamma)[0,1]
+            l = float(np.dot(xA, xB.T))
+            return alpha * r + (1.0 - alpha) * l
+        return kernel_fn
+
     # 5. 实例化 sample 类
-    print("初始化 D-TRUST 采样器...")
+    # enable support-vector deduplication to avoid redundant samples in same region
+    use_sv_dedup = True
+    dedup_clusters = 20
+    dedup_per_class = False
+
+    print("初始化 D-TRUST 采样器...", f"use_sv_dedup={use_sv_dedup}", f"dedup_clusters={dedup_clusters}")
     dtrust_sampler = sample.sample(
         clf=clf,
         data=data,
@@ -69,7 +94,12 @@ def main():
         gam_ur=GAM_UR,
         lam=LAM,
         lam_ur=LAM_UR,
-        gam_clf=gam_clf
+        gam_clf=gam_clf,
+        kernel_fn=mixed_kernel_factory(alpha=0.6, gamma=gam_clf),
+        kernel='rbf',
+        use_sv_dedup=use_sv_dedup,
+        dedup_clusters=dedup_clusters,
+        dedup_per_class=dedup_per_class
     )
 
     # 6. 开始主动学习循环
