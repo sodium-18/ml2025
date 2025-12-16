@@ -197,26 +197,53 @@ class sample( object ):
                     # dec_Train: shape (n_candidates, n_classes)
                     X_feats = dec_Train
                     n_cand = X_feats.shape[0]
-                    n_clusters = min(int(self.dedup_clusters), n_cand)
-                    if n_clusters <= 0:
-                        raise ValueError('n_clusters <= 0')
-                    kmeans = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit(X_feats)
-                    labels = kmeans.labels_
                     cluster_reps = []
-                    for cl in range(n_clusters):
-                        members = [idx for idx, lab in enumerate(labels) if lab == cl]
-                        if not members:
-                            continue
-                        # pick the member with smallest resultList (highest priority)
-                        best_member = min(members, key=lambda idx: resultList[idx])
-                        cluster_reps.append(best_member)
+                    if self.dedup_per_class:
+                        # per-class dedup: for each class, cluster top candidates by that class evidence
+                        n_classes = X_feats.shape[1]
+                        for cls in range(n_classes):
+                            # evidence for this class
+                            evid = X_feats[:, cls].ravel()
+                            # pick top candidates by evidence (higher evidence first)
+                            top_k = np.argsort(-evid)
+                            # limit to reasonable number
+                            top_k = top_k[:max(1, min(self.dedup_clusters * 2, len(top_k)))]
+                            if len(top_k) == 0:
+                                continue
+                            # cluster their original input-space features (self.data)
+                            X_top = self.data[np.array(self.candidate_index)[top_k], :]
+                            n_clusters = min(int(self.dedup_clusters), X_top.shape[0])
+                            if n_clusters <= 0:
+                                continue
+                            kmeans = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit(X_top)
+                            labels = kmeans.labels_
+                            for cl in range(n_clusters):
+                                members = [top_k[idx] for idx, lab in enumerate(labels) if lab == cl]
+                                if not members:
+                                    continue
+                                # choose member with best (smallest) resultList score
+                                best_member = min(members, key=lambda idx: resultList[idx])
+                                cluster_reps.append(best_member)
+                    else:
+                        # global dedup: cluster in evidence space
+                        n_clusters = min(int(self.dedup_clusters), n_cand)
+                        if n_clusters > 0:
+                            kmeans = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit(X_feats)
+                            labels = kmeans.labels_
+                            for cl in range(n_clusters):
+                                members = [idx for idx, lab in enumerate(labels) if lab == cl]
+                                if not members:
+                                    continue
+                                best_member = min(members, key=lambda idx: resultList[idx])
+                                cluster_reps.append(best_member)
+
+                    # deduplicate cluster_reps
+                    cluster_reps = list(dict.fromkeys(cluster_reps))
                     # choose up to n_batch representatives with smallest score
                     if len(cluster_reps) >= n_batch:
-                        # sort cluster reps by score and take top n_batch
                         cluster_reps_sorted = sorted(cluster_reps, key=lambda idx: resultList[idx])
                         targetIndexList = cluster_reps_sorted[:n_batch]
                     else:
-                        # take all cluster reps, then fill remaining with global bests
                         chosen = list(cluster_reps)
                         remaining = [i for i in range(len(resultList)) if i not in chosen]
                         more = sorted(remaining, key=lambda idx: resultList[idx])[:(n_batch - len(chosen))]

@@ -76,15 +76,74 @@ def main():
         return kernel_fn
 
     # 5. 实例化 sample 类
+    # optional: use deep embedding as kernel input (deep-kernel)
+    use_deep_kernel = False  # set True to enable PyTorch-based embedding
+
     # enable support-vector deduplication to avoid redundant samples in same region
     use_sv_dedup = True
     dedup_clusters = 20
     dedup_per_class = False
 
     print("初始化 D-TRUST 采样器...", f"use_sv_dedup={use_sv_dedup}", f"dedup_clusters={dedup_clusters}")
+    # if deep kernel enabled, try to compute embeddings first
+    if use_deep_kernel:
+        try:
+            import torch
+            import torch.nn as nn
+            import torch.optim as optim
+
+            class SimpleEncoder(nn.Module):
+                def __init__(self, input_dim, emb_dim=32):
+                    super().__init__()
+                    self.net = nn.Sequential(
+                        nn.Linear(input_dim, 64),
+                        nn.ReLU(),
+                        nn.Linear(64, emb_dim)
+                    )
+                def forward(self, x):
+                    return self.net(x)
+
+            # prepare small training for encoder using initial labeled set
+            X_np = data.astype(np.float32)
+            X_init = X_np[train_index]
+            y_init = labels[train_index]
+            enc = SimpleEncoder(X_np.shape[1], emb_dim=32)
+            opt = optim.Adam(enc.parameters(), lr=1e-3)
+            loss_fn = nn.CrossEntropyLoss()
+            enc.train()
+            X_tensor = torch.from_numpy(X_init)
+            y_tensor = torch.from_numpy(y_init.astype(np.longlong))
+            # small number of epochs
+            for ep in range(30):
+                opt.zero_grad()
+                out = enc(X_tensor)
+                # small classifier head for self-supervised training (linear probe)
+                # use linear classifier temporarily
+                logits = out
+                # if classes > embedding dim, still compute loss by projecting
+                if logits.shape[1] < y_tensor.max()+1:
+                    # project to num classes
+                    proj = nn.Linear(logits.shape[1], int(y_tensor.max()+1))
+                    logits = proj(out)
+                loss = loss_fn(logits, y_tensor)
+                loss.backward()
+                opt.step()
+
+            # compute embeddings for all data
+            enc.eval()
+            with torch.no_grad():
+                all_emb = enc(torch.from_numpy(X_np)).numpy()
+            data_to_use = all_emb
+            print('使用 deep-embedding 作为 SVM 输入,shape=', data_to_use.shape)
+        except Exception as e:
+            print('无法启用 deep kernel(缺少 torch 或出错），回退到原始数据。错误：', e)
+            data_to_use = data
+    else:
+        data_to_use = data
+
     dtrust_sampler = sample.sample(
         clf=clf,
-        data=data,
+        data=data_to_use,
         Y=labels,
         train_index=train_index,
         candidate_index=candidate_index,
