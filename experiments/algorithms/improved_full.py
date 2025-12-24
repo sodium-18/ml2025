@@ -17,19 +17,20 @@ class sample(object):
         self.test_index = list(test_index)
         self.gam_clf = gam_clf 
         
-        # 初始参数 (消融实验固定参数)
+        # 初始参数
         self.gam = 1.0
         self.lam = 1.0
         self.al_count = 0
+        self.M = M 
         
-        # 接收外部参数 (允许 runner 覆盖默认值)
+        # 接收外部参数
         self.use_sv_dedup = kwargs.get('use_sv_dedup', True)
-        self.dedup_clusters = kwargs.get('dedup_clusters', 20) # 默认20，但 runner 会传 10
+        self.dedup_clusters = kwargs.get('dedup_clusters', 20)
+        # 默认指数衰减率 0.02
+        self.gam_ur = kwargs.get('gam_ur', 0.02)
         
-        # 初始训练
         self.clf.fit(self.data[self.train_index, :], self.Y[self.train_index])
         
-        # 计算初始对偶变量
         dualAve_list = []
         for i in range(len(self.clf.estimators_)):
             cur_E = self.clf.estimators_[i]
@@ -75,8 +76,9 @@ class sample(object):
             mean_sp = np.mean(sp_nList) if np.mean(sp_nList) != 0 else 1.0
             resultList = np.amax(dec_Train / mean_sp, axis=1)
             
-            # === 指数衰减 (固定 0.02) ===
-            decay_factor = np.exp(-0.02 * self.al_count)
+            # === 【修正】直接使用指数衰减，不强制 Entropy=0 ===
+            # 让模型从第1轮就开始火力全开
+            decay_factor = np.exp(-self.gam_ur * self.al_count)
             current_lam = self.lam * decay_factor
             current_gam = self.gam * decay_factor
             
@@ -86,6 +88,12 @@ class sample(object):
                 dfpair = heapq.nlargest(2, probs)
                 margin = (dfpair[0] - dfpair[1]) if len(dfpair) > 1 else 0
                 ent = sp.stats.entropy(probs)
+                
+                # 计算得分 (nsmallest 取最小)
+                # Score = Gam * Similarity(坏) + Lam * Margin(好) - Entropy(好)
+                # 解释：Similarity大 -> Redundant -> Score大 -> 不选
+                #       Margin小 -> Uncertain -> Score小 -> 选
+                #       Entropy大 -> Uncertain -> -Ent小 -> Score小 -> 选
                 score = (current_gam * resultList[i]) + (current_lam * margin) - ent
                 final_scores.append(score)
             
@@ -94,17 +102,20 @@ class sample(object):
                 try:
                     n_cand = len(final_scores)
                     n_clusters = min(self.dedup_clusters, n_cand)
-                    if n_clusters > 0:
+                    if n_clusters > 0 and n_clusters < n_cand:
                         kmeans = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit(dec_Train)
                         labels = kmeans.labels_
                         cluster_reps = []
                         for cl in range(n_clusters):
                             members = [idx for idx, lab in enumerate(labels) if lab == cl]
                             if not members: continue
+                            # 选该簇中 score 最小的 (最好的)
                             best_member = min(members, key=lambda idx: final_scores[idx])
                             cluster_reps.append(best_member)
                         cluster_reps = list(dict.fromkeys(cluster_reps))
+                        # 再次排序
                         targetIndexList = sorted(cluster_reps, key=lambda idx: final_scores[idx])[:n_batch]
+                        # 补齐
                         if len(targetIndexList) < n_batch:
                             chosen = set(targetIndexList)
                             remaining = [i for i in range(len(final_scores)) if i not in chosen]
@@ -122,7 +133,7 @@ class sample(object):
                 ranking_scores.append(1.0 - np.max(dec_Train[i, :])) 
             targetIndexList = list(np.argsort(ranking_scores)[:n_batch])
             
-        # 3. 更新
+        # 更新
         delList = []
         for targetIndex in targetIndexList:
             delList.append(self.candidate_index[targetIndex])
