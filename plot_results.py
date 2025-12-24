@@ -75,7 +75,6 @@ def load_results(dataset_name=None, experiment_id=None):
 # === 主绘图函数（保持原始风格）===
 def plot_original_style(result_data, save_figure=True, show_figure=True, 
                         smooth_weight=0.8, ylim_adjust=True):
-    """绘制原始风格的对比图（Queries改为Rounds）"""
     dataset_name = result_data['dataset']
     
     # 获取数据
@@ -108,14 +107,14 @@ def plot_original_style(result_data, save_figure=True, show_figure=True,
     
     # 绘制平滑曲线（主视觉）- 保持原始样式
     plt.plot(iters, smooth_orig, linestyle='--', color='gray', linewidth=2, 
-             label='Original D-TRUST')
+             label='D-TRUST')
     plt.plot(iters, smooth_imp, linestyle='-', color='#d62728', linewidth=2.5, 
-             label='Improved Method (Ours)')
+             label='AID-TRUST')
     
     # 设置标题和标签 - Queries改为Rounds
     plt.title(f'Performance Comparison on {dataset_name.capitalize()} Dataset', 
               fontsize=15, fontweight='bold')
-    plt.xlabel('Number of Rounds', fontsize=12)
+    plt.xlabel('Rounds', fontsize=12)
     plt.ylabel('Test Accuracy', fontsize=12)
     
     # 设置x轴刻度 - 根据轮次数量调整
@@ -151,26 +150,27 @@ def plot_original_style(result_data, save_figure=True, show_figure=True,
         pass
     
     plt.grid(True, linestyle='--', alpha=0.6)
+    legend_loc = 'lower right'
     
-    # 图例位置根据最终准确率调整
-    if acc_imp[-1] > acc_orig[-1]:
-        legend_loc = 'lower right'
-    else:
-        legend_loc = 'upper right'
+    # # 图例位置根据最终准确率调整
+    # if acc_imp[-1] > acc_orig[-1]:
+    #     legend_loc = 'lower right'
+    # else:
+    #     legend_loc = 'upper right'
     
     plt.legend(fontsize=12, loc=legend_loc)
     
-    # 在右上角添加最终准确率信息
-    final_text = f'Final: Original={acc_orig[-1]:.4f}, Improved={acc_imp[-1]:.4f}'
-    plt.annotate(final_text, xy=(0.98, 0.02), xycoords='axes fraction',
-                 fontsize=11, ha='right', va='bottom',
-                 bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+    # # 在右上角添加最终准确率信息
+    # final_text = f'Final: Original={acc_orig[-1]:.4f}, Improved={acc_imp[-1]:.4f}'
+    # plt.annotate(final_text, xy=(0.98, 0.02), xycoords='axes fraction',
+    #              fontsize=11, ha='right', va='bottom',
+    #              bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
     
-    # 在左上角添加数据集和轮次信息
-    info_text = f'{dataset_name.upper()} Dataset\n{total_rounds} Rounds'
-    plt.annotate(info_text, xy=(0.02, 0.98), xycoords='axes fraction',
-                 fontsize=10, ha='left', va='top',
-                 bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
+    # # 在左上角添加数据集和轮次信息
+    # info_text = f'{dataset_name.upper()} Dataset\n{total_rounds} Rounds'
+    # plt.annotate(info_text, xy=(0.02, 0.98), xycoords='axes fraction',
+    #              fontsize=10, ha='left', va='top',
+    #              bbox=dict(boxstyle="round,pad=0.3", facecolor="white", alpha=0.8))
     
     plt.tight_layout()
     
@@ -178,7 +178,10 @@ def plot_original_style(result_data, save_figure=True, show_figure=True,
         # 生成文件名
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         save_name = f'compare_{dataset_name}_{total_rounds}rounds_{timestamp}.png'
-        plt.savefig(save_name, dpi=300, bbox_inches='tight')
+        result_dir = Path(RESULTS_DIR)
+        results_dir = result_dir.resolve()
+        save_path = results_dir / save_name
+        plt.savefig(save_path, dpi=300, bbox_inches='tight')
         print(f"\n对比图已保存为: {save_name}")
     
     if show_figure:

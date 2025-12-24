@@ -325,8 +325,8 @@ def run_full_experiment():
     print(f"结果文件: {result_file}")
     print(f"{'='*60}")
     
-    # 绘制简单图表
-    plot_simple_result(result)
+    # # 绘制简单图表
+    # plot_simple_result(result)
     
     return result
 
