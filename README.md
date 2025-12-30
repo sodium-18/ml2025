@@ -29,7 +29,7 @@ Compared to the baseline (original D-TRUST), this implementation introduces thre
 
 ### Experiments & Analysis (`experiments/runners/`)
 
- `run_ablation_vehicle.py`: Runs the ablation study to verify the contribution of each module (Init, Decay, Diversity) separately.
+ `run_abla.py`: Runs the ablation study to verify the contribution of each module (Init, Decay, Diversity) separately.
  `run_parameter_sensitivity.py`: Tests the sensitivity of hyperparameters (e.g., Decay Rate, Top-K size, Initialization size).
 
 ### Data
@@ -70,12 +70,19 @@ python run_medium.py
 
 This will generate a plot showing the learning curves (Accuracy vs. Number of Queries).
 
+To run on all datasets:
+
+```bash
+python experiments/runners/run_comparison_universal.py
+
+```
+
 ### 2. Run Ablation Studies
 
 To analyze the effect of each individual component (e.g., only changing initialization or only changing decay):
 
 ```bash
-python experiments/runners/run_ablation_vehicle.py
+python experiments/runners/run_abla.py
 
 ```
 
@@ -100,7 +107,7 @@ If you have the compiled `.exe` file (`AID-TRUST_Demo.exe`):
 
 Experiments were conducted on Vehicle, Segment, Yeast, and Dermatology datasets.
 
-* **Convergence:** The exponential decay strategy allows the model to improve accuracy faster in the early-to-mid stages (Rounds 20-60).
+* **Convergence:** The exponential decay strategy allows the model to improve accuracy faster in the early-to-mid stages .
 * **Stability:** Top-K deduplication prevents performance drops in later stages by avoiding redundant sampling.
 * **Initialization:** K-Means initialization provides a higher starting accuracy (approx. +5% to +10%) compared to random initialization.
 
