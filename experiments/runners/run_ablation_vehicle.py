@@ -12,7 +12,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import pairwise_distances_argmin_min
 import warnings
 
-# 忽略警告
+# Suppress warnings
 warnings.filterwarnings("ignore")
 
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -20,16 +20,16 @@ project_root = os.path.dirname(os.path.dirname(current_dir))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# 导入算法模块
+# Import algorithm modules
 try:
     from experiments.algorithms import baseline as baseline_algo
     from experiments.algorithms import improved_kmeans as init_algo
     from experiments.algorithms import improved_decay as decay_algo
     from experiments.algorithms import improved_diversity as diversity_algo
     from experiments.algorithms import improved_full as full_algo
-    print(">>> 算法模块导入成功")
+    print(">>> Algorithm modules imported successfully")
 except ImportError as e:
-    print(f"导入错误: {e}")
+    print(f"Import error: {e}")
     exit()
 
 DATASET_NAME = 'vehicle' 
@@ -69,7 +69,7 @@ def get_random_init(pool_indices, n=10):
     return train_idx, cand_idx
 
 def run_single_algo(algo_module, name, X, y, train_idx, cand_idx, test_idx, **kwargs):
-    print(f"正在运行: {name}")
+    print(f"Running: {name}")
     clf = OneVsRestClassifier(svm.SVC(C=10.0, probability=True, kernel='rbf', gamma=0.1, random_state=42))
     params = {
         'clf': clf, 'data': X, 'Y': y,
@@ -111,9 +111,9 @@ def main():
     pool_idx = all_indices[:len(X_train)]
 
     rand_train, rand_cand = get_random_init(pool_idx)
-    km_train, km_cand = get_kmeans_init(data, pool_idx, n=20) # 确保 Baseline 和 Init 也是 20
+    km_train, km_cand = get_kmeans_init(data, pool_idx, n=20) # Ensure Baseline and Init also use 20
 
-    print(f"初始集大小: {len(km_train)}")
+    print(f"Initial set size: {len(km_train)}")
 
     results = {}
 
@@ -121,7 +121,7 @@ def main():
     results['Baseline'] = run_single_algo(
         baseline_algo, 'Baseline (Original)', 
         data, labels, rand_train, rand_cand, test_idx,
-        gam_ur=0.005 # 线性慢衰减
+        gam_ur=0.005 # Linear slow decay
     )
     
     # 2. + Init
@@ -146,7 +146,7 @@ def main():
     )
     
     # 5. Full Method (Ours)
-    # 关键：这里用 gam_ur=0.05 稍微快一点
+    # Key: Use gam_ur=0.05 for slightly faster decay
     results['Full Method'] = run_single_algo(
         full_algo, 'Ours (Full)', 
         data, labels, km_train, km_cand, test_idx,
@@ -173,7 +173,7 @@ def main():
     plt.xlabel('Number of Queries', fontsize=14); plt.ylabel('Accuracy', fontsize=14)
     plt.grid(True, linestyle='--', alpha=0.5); plt.legend(fontsize=12)
     plt.savefig(os.path.join(current_dir, f'ablation_{DATASET_NAME}_fixed.png'), dpi=300)
-    print(f"\n[完成] 消融实验图已保存！")
+    print(f"\n[Complete] Ablation study visualization saved!")
     plt.show()
 
 if __name__ == "__main__":

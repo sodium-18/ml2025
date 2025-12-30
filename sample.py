@@ -1,16 +1,16 @@
 # -*- coding: utf-8 -*-
 import scipy as sp
-import scipy.stats # 新增这一行
+import scipy.stats # Added for statistical operations
 import numpy as np
 import heapq 
 from sklearn.metrics.pairwise import rbf_kernel
 import operator
 
 def dissonance(b):
-        #def Bal(i,j)
+        # def Bal(i,j)
         def Bal(b,i,j):
             return 1-np.abs(b[i]-b[j])/(b[i]+b[j])
-        #get evidence
+        # Get evidence
         res=0
         for i in range(len(b)):
             excludeInd=[x for x in range(len(b)) if x != i]
@@ -20,59 +20,59 @@ def dissonance(b):
                 tem1+=(b[j]*Bal(b,i,j))
                 tem2+=(b[j])
             if(tem2==0):
-                #print(0)
+                # print(0)
                 return 0
             res+=b[i]*tem1/tem2
-        #print(res)
+        # print(res)
         return res
 
 
-# sample class
+# Sample class for active learning
 class sample( object ):
-#    initialization
+    # Initialization
     def __init__( self, clf, data, Y, \
                  train_index, candidate_index, test_index, M,\
                  gam, gam_ur, lam, lam_ur, gam_clf = 1, kernel_fn=None, kernel='rbf', poly_degree=3, coef0=1.0,
                  use_sv_dedup=False, dedup_clusters=10, dedup_per_class=False ):
-#        basic initializations
-#        classifier
+        # Basic initializations
+        # Classifier
         self.clf = clf
-#        data(x)
+        # Data (x)
         self.data = data
-#        label(t)
+        # Labels (t)
         self.Y = Y
-#        training, candidate, and testing index
+        # Training, candidate, and testing indices
         self.train_index=list(train_index)
         self.candidate_index=list(candidate_index)
         self.test_index=list(test_index)
-#        initialize the model
+        # Initialize the model
         self.clf.fit( self.data[ self.train_index , : ] , \
                      self.Y[ self.train_index] )
-#        compute the average dual variable value        
+        # Compute the average dual variable value
         for i in range(len(self.clf.estimators_)):
-#            this is using OneVsRestClassifier()
+            # Using OneVsRestClassifier()
             cur_E = self.clf.estimators_[i]
             dualCoef = cur_E.dual_coef_
             dualAve = np.mean(np.absolute(dualCoef))
-        self.dualAve_all_0 = np.mean(dualAve)# <--- 加上 self.
-#        get the predictive probabilities over candidates
+        self.dualAve_all_0 = np.mean(dualAve)# <--- Add self. prefix
+        # Get the predictive probabilities over candidates
         self.prob = self.clf.predict_proba( \
                             self.data[ self.candidate_index , : ] )
         self.nc = len( set(Y) )
 
-#        iteration count
+        # Iteration count
         self.al_count = 0
         self.M = M
-#        initial balance parameter
+        # Initial balance parameter
         self.gam = gam
         self.lam = lam
-#        Update rate
+        # Update rate
         self.gam_ur = gam_ur
 
         self.lam_ur = lam_ur
-#        evaluation
+        # Performance evaluation
         self.currentPerformance=0
-        #        gam_clf for rbf kernel (=1/2l^2), l = length scale
+        # gam_clf for rbf kernel (=1/2l^2), l = length scale
         self.gam_clf = gam_clf
         # custom kernel function (callable) or kernel name
         self.kernel_fn = kernel_fn

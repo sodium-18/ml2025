@@ -14,25 +14,25 @@ import warnings
 
 warnings.filterwarnings("ignore")
 
-# 1. 路径设置
+# 1. Path configuration
 current_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(os.path.dirname(current_dir))
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
-# 2. 导入算法
+# 2. Import algorithm modules
 try:
     from experiments.algorithms import baseline as baseline_algo
     from experiments.algorithms import improved_kmeans as init_algo
     from experiments.algorithms import improved_decay as decay_algo
     from experiments.algorithms import improved_diversity as diversity_algo
     from experiments.algorithms import improved_full as full_algo
-    print(">>> 算法模块导入成功")
+    print(">>> Algorithm modules imported successfully")
 except ImportError as e:
-    print(f"导入错误: {e}")
+    print(f"Import error: {e}")
     exit()
 
-# 3. 实验配置
+# 3. Experiment configuration
 DATASET_NAME = 'segment' 
 M_ITERATIONS = 120 
 BATCH_SIZE = 1
@@ -63,7 +63,7 @@ def load_data(name):
     except: return None, None
 
 def get_kmeans_init(X, pool_indices, n=10):
-    """K-Means 智能初始化 (Seed 42)"""
+    """K-Means intelligent initialization (Seed 42)"""
     kmeans = KMeans(n_clusters=n, random_state=42, n_init=10)
     kmeans.fit(X[pool_indices])
     closest, _ = pairwise_distances_argmin_min(kmeans.cluster_centers_, X[pool_indices])
@@ -72,7 +72,7 @@ def get_kmeans_init(X, pool_indices, n=10):
     return train_idx, cand_idx
 
 def get_random_init(pool_indices, n=10):
-    """随机初始化 (Seed 1 - Segment上表现较好)"""
+    """Random initialization (Seed 1 - better performance on Segment)"""
     np.random.seed(1) 
     shuffled = np.random.permutation(pool_indices)
     train_idx = list(shuffled[:n])
@@ -80,11 +80,11 @@ def get_random_init(pool_indices, n=10):
     return train_idx, cand_idx
 
 def run_single_algo(algo_module, name, X, y, train_idx, cand_idx, test_idx, **kwargs):
-    print(f"正在运行: {name}")
-    # 打印前3个索引，确保传入正确
-    print(f"  -> 初始样本ID (前3个): {train_idx[:3]}")
+    print(f"Running: {name}")
+    # Print first 3 indices to verify correct input
+    print(f"  -> Initial sample IDs (first 3): {train_idx[:3]}")
 
-    # 【重要】锁定 SVM 随机性，消除波动
+    # [IMPORTANT] Fix SVM randomness to eliminate fluctuations
     clf = OneVsRestClassifier(svm.SVC(C=10.0, probability=True, kernel='rbf', gamma=0.1, random_state=42))
     
     params = {
@@ -99,9 +99,9 @@ def run_single_algo(algo_module, name, X, y, train_idx, cand_idx, test_idx, **kw
     
     sampler = algo_module.sample(**params)
     
-    # 记录初始精度
+    # Record initial accuracy
     init_acc = sampler.evaluate()
-    print(f"  -> 初始精度: {init_acc:.4f}")
+    print(f"  -> Initial accuracy: {init_acc:.4f}")
     accs = [init_acc]
     
     for i in range(M_ITERATIONS):
@@ -133,20 +133,20 @@ def main():
     test_idx = list(all_indices[len(X_train):])
     pool_idx = all_indices[:len(X_train)]
 
-    # === 初始化 ===
+    # === Initialization ===
     rand_train, rand_cand = get_random_init(pool_idx) # Seed 1
     km_train, km_cand = get_kmeans_init(data, pool_idx) # Seed 42
 
     results = {}
 
-    # 1. Baseline
+    # 1. Baseline method
     results['Baseline'] = run_single_algo(
         baseline_algo, 'Baseline (Original)', 
         data, labels, rand_train, rand_cand, test_idx,
         gam_ur=0.005, lam_ur=0.01 
     )
     
-    # 2. + Init (关键对照组)
+    # 2. + Init (key control group)
     results['+ Init'] = run_single_algo(
         init_algo, 'Only K-Means Init', 
         data, labels, km_train, km_cand, test_idx, 
@@ -167,15 +167,15 @@ def main():
         gam_ur=0.005, lam_ur=0.01
     )
     
-    # 5. Full Method (必须赢)
-    # 关键：一定要传入 km_train
+    # 5. Full Method (complete approach)
+    # Key: Must pass km_train
     results['Full Method'] = run_single_algo(
         full_algo, 'Ours (Full)', 
         data, labels, km_train, km_cand, test_idx,
         use_sv_dedup=True, dedup_clusters=10
     )
 
-    # 画图
+    # Plot results
     plt.figure(figsize=(10, 7))
     styles = {
         'Baseline':      {'color': 'gray',   'ls': '--', 'lw': 1.5},
@@ -200,7 +200,7 @@ def main():
     plt.xlabel('Queries', fontsize=14); plt.ylabel('Accuracy', fontsize=14)
     plt.grid(True, linestyle='--', alpha=0.5); plt.legend(fontsize=12)
     plt.savefig(os.path.join(current_dir, f'ablation_{DATASET_NAME}_fixed.png'), dpi=300)
-    print(f"\n[完成] 修正版图表已保存")
+    print(f"\n[Complete] Corrected visualization saved")
     plt.show()
 
 if __name__ == "__main__":
