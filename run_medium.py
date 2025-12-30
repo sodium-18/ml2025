@@ -8,7 +8,7 @@ from sklearn.multiclass import OneVsRestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.impute import SimpleImputer
-import sample as original_algo
+import sample_old as original_algo
 import sample_final as improved_algo
 
 # ==========================================

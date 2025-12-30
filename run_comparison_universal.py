@@ -29,7 +29,7 @@ DATASET_NAME = 'yeast'  # 修改此行以选择数据集
 
 # 导入算法模块
 try:
-    import sample as original_algo
+    import sample_old as original_algo
     print(">>> 成功导入原始算法: sample.py")
 except ImportError:
     print("错误：找不到 sample.py")
